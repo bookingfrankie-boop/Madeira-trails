@@ -1,0 +1,15 @@
+{
+  "name": "Madeira Trails",
+  "short_name": "Madeira Trails",
+  "description": "Explora levadas e trilhos da Madeira e acompanha as tuas caminhadas.",
+  "lang": "pt-PT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f2ed",
+  "theme_color": "#183a32",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
