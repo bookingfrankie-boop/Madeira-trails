@@ -57,7 +57,7 @@ async function readJson(req) {
 }
 
 function rateLimit(req, res, limit = 120, scope = 'general') {
-  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').toString().split(',')[0].trim()
+  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').toString().split(',').at(-1).trim()
   const key = `${scope}:${ip}`
   const now = Date.now()
   const current = rateBuckets.get(key)
@@ -71,7 +71,7 @@ function rateLimit(req, res, limit = 120, scope = 'general') {
 }
 
 function cookieHeader(token, maxAge) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+  const secure = process.env.NODE_ENV === 'development' ? '' : '; Secure'
   return `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`
 }
 
