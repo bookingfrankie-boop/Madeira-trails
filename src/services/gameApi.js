@@ -16,6 +16,8 @@ export const gameApi = {
   login: (username, password) => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request('/api/auth/logout', { method: 'POST', body: '{}' }),
   state: () => request('/api/game/state'),
+  exportData: () => request('/api/account/export'),
+  deleteAccount: (password) => request('/api/auth/account', { method: 'DELETE', body: JSON.stringify({ password }) }),
   submitActivity: (activity) => request('/api/activities', {
     method: 'POST',
     body: JSON.stringify({
