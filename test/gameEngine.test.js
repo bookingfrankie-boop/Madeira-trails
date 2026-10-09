@@ -41,3 +41,34 @@ test('unsupported activity types are excluded from modality progress', () => {
   assert.equal(stats.totalTypes, 1)
   assert.equal(stats.totalMeters, 200)
 })
+
+import { nearestZone, validateRoute } from '../server/gameRules.js'
+
+test('server accepts plausible GPS activity on Madeira and assigns a zone', () => {
+  const points = [
+    [-16.9256, 32.6669],
+    [-16.9245, 32.6672],
+    [-16.9234, 32.6676],
+  ]
+  const distance = validateRoute(points, 'walking', 300)
+  assert.ok(distance > 100)
+  assert.equal(nearestZone(points), 'funchal')
+})
+
+test('server rejects activity outside the Madeira island play area', () => {
+  assert.throws(
+    () => validateRoute([[-16.35, 33.07], [-16.34, 33.07], [-16.33, 33.07]], 'walking', 300),
+    (error) => error.status === 422 && error.message.includes('fora do território'),
+  )
+})
+
+test('server rejects implausible average speed and too few GPS samples', () => {
+  assert.throws(
+    () => validateRoute([[-16.9256, 32.6669], [-16.915, 32.6669], [-16.905, 32.6669]], 'running', 60),
+    (error) => error.status === 422 && error.message.includes('velocidade'),
+  )
+  assert.throws(
+    () => validateRoute([[-16.9256, 32.6669], [-16.9245, 32.6672]], 'walking', 300),
+    (error) => error.status === 422,
+  )
+})
