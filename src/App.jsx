@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import GameHub from './components/GameHub.jsx'
+import { activityTypes } from './game/gameEngine.js'
 import {
   Activity, ArrowLeft, ArrowRight, ArrowUpRight, Camera, Check,
   ChevronDown, Clock3, Compass, Footprints, Heart, LocateFixed, Map as MapIcon,
   MapPin, Mountain, Navigation, Pause, Play, Search, Share2,
-  ShieldAlert, SlidersHorizontal, Star, StopCircle, Trees, Upload, X,
+  ShieldAlert, SlidersHorizontal, Star, StopCircle, Trees, Upload, X, Gamepad2,
 } from 'lucide-react'
 const MapCanvas = lazy(() => import('./components/TrailMap.jsx'))
 
@@ -17,12 +19,14 @@ function TrailMap(props) {
 import { officialSources, trails } from './data/trails.js'
 import { useGpsTracking } from './hooks/useGpsTracking.js'
 import { getActivities, saveActivity } from './services/activityStorage.js'
+import { gameApi } from './services/gameApi.js'
 import { distanceAlongRoute, distanceBetweenCoordinates } from './utils/geo.js'
 
 const tabs = [
   { id: 'explore', label: 'Explorar', icon: Compass },
   { id: 'map', label: 'Mapa', icon: MapIcon },
   { id: 'activities', label: 'Atividades', icon: Footprints },
+  { id: 'game', label: 'Jogo', icon: Gamepad2 },
   { id: 'profile', label: 'Perfil', icon: Mountain },
 ]
 
@@ -108,10 +112,18 @@ function TrailDetail({ trail, onBack, onStart, onLike, liked, comment, setCommen
 }
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState('checking')
+  const [authUser, setAuthUser] = useState(null)
+  const [authMode, setAuthMode] = useState('login')
+  const [authUsername, setAuthUsername] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
   const [page, setPage] = useState('explore')
   const [search, setSearch] = useState('')
   const [selectedTrail, setSelectedTrail] = useState(null)
   const [activities, setActivities] = useState(getActivities)
+  const [activityType, setActivityType] = useState('walking')
   const [community, setCommunity] = useState(() => {
     try { return JSON.parse(localStorage.getItem('madeira-trails:community') || '{}') } catch { return {} }
   })
@@ -120,6 +132,16 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const gps = useGpsTracking()
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    gameApi.me().then(({ user }) => {
+      if (active) { setAuthUser(user); setAuthStatus('authenticated') }
+    }).catch(() => {
+      if (active) setAuthStatus('unauthenticated')
+    })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     const captureInstall = (event) => { event.preventDefault(); setInstallPrompt(event) }
@@ -152,6 +174,8 @@ export default function App() {
       id: crypto.randomUUID(),
       trailName: selectedTrail?.name ?? 'Caminhada livre',
       trailCode: selectedTrail?.code ?? null,
+      municipality: selectedTrail?.municipality ?? null,
+      activityType,
       date: new Date().toISOString(),
       distance: result.distance,
       elapsed: result.elapsed,
@@ -181,6 +205,34 @@ export default function App() {
     event.target.value = ''
   }
 
+  const submitAuth = async (event) => {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      const result = authMode === 'register'
+        ? await gameApi.register(authUsername.trim(), authPassword)
+        : await gameApi.login(authUsername.trim(), authPassword)
+      setAuthUser(result.user)
+      setAuthStatus('authenticated')
+      setAuthPassword('')
+    } catch (error) {
+      setAuthError(error.message || 'Não foi possível validar os dados. Tenta novamente.')
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const signOut = async () => {
+    try { await gameApi.logout() } catch { /* fecha a interface mesmo se a rede falhar */ }
+    setAuthUser(null)
+    setAuthPassword('')
+    setAuthStatus('unauthenticated')
+    setAuthMode('login')
+    setPage('explore')
+    setSelectedTrail(null)
+  }
+
   const onAddComment = (event) => {
     event.preventDefault()
     if (!comment.trim() || !selectedTrail) return
@@ -199,7 +251,7 @@ export default function App() {
       </aside>
 
       <div className="app-main">
-        <header className="topbar"><button className="mobile-brand" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><span className="brand-mark"><Mountain size={18} /></span> MADEIRA TRAILS</button><div className="topbar-location"><MapPin size={14} /> Ilha da Madeira <span>·</span> Portugal</div><div className="topbar-actions">{installPrompt && <button className="install-button" type="button" onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null) }}>Instalar aplicação</button>}<button className="topbar-icon" type="button" onClick={() => setPage('profile')} aria-label="Perfil"><Mountain size={17} /></button></div></header>
+        <header className="topbar"><button className="mobile-brand" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><span className="brand-mark"><Mountain size={18} /></span> MADEIRA TRAILS</button><div className="topbar-location"><MapPin size={14} /> Ilha da Madeira <span>·</span> Portugal</div><div className="topbar-actions"><button className="topbar-icon" type="button" onClick={() => setPage('profile')} aria-label="Perfil"><Mountain size={17} /></button></div></header>
 
         <main className="workspace">
           {selectedTrail && page === 'explore' ? <TrailDetail trail={selectedTrail} onBack={() => setSelectedTrail(null)} onStart={() => beginTrail(selectedTrail)} onLike={() => updateCommunity(selectedTrail.id, { liked: !community[selectedTrail.id]?.liked })} liked={!!community[selectedTrail.id]?.liked} comment={comment} setComment={setComment} onComment={onAddComment} onPhoto={onAddPhoto} photos={community[selectedTrail.id]?.photos ?? []} comments={community[selectedTrail.id]?.comments ?? []} rating={community[selectedTrail.id]?.rating ?? 0} onRate={(rating) => updateCommunity(selectedTrail.id, { rating })} /> : <>
@@ -217,19 +269,52 @@ export default function App() {
 
             {page === 'map' && <section className="map-page"><div className="map-page-heading"><div><button className="back-link" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><ArrowLeft size={14} /> Descobrir</button><span className="section-kicker">Cartografia · OpenStreetMap</span><h1>{selectedTrail ? selectedTrail.name : 'A ilha, à tua escala.'}</h1><p>{selectedTrail ? `${selectedTrail.code} · ${selectedTrail.start} → ${selectedTrail.end}` : 'Explora a Ilha da Madeira e encontra o teu caminho.'}</p></div><span className="map-live-status"><span className="condition-dot" />{gps.tracking ? gps.paused ? 'EM PAUSA' : 'GPS ATIVO' : 'GPS DESLIGADO'}</span></div>
               <div className="map-layout"><div className="map-frame"><TrailMap trail={selectedTrail} position={gps.position} points={gps.points} onLocate={locateAndShow} onStart={() => beginTrail(selectedTrail)} tracking={gps.tracking} paused={gps.paused} /></div><aside className="map-panel"><span className="section-kicker">{gps.tracking ? gps.paused ? 'Em descanso' : 'Caminhada em curso' : 'Caminhada'}</span><h2>{gps.tracking ? selectedTrail?.name ?? 'Caminhada livre' : selectedTrail?.name ?? 'Pronto a partir?'}</h2><p>{selectedTrail ? `${selectedTrail.start} até ${selectedTrail.end}` : 'Regista uma caminhada com GPS. O percurso e as métricas ficam guardados neste dispositivo.'}</p>
-                {gps.tracking ? <><div className="tracking-metrics"><div><span>Tempo decorrido</span><strong>{formatTime(gps.elapsed)}</strong></div><div><span>Distância percorrida</span><strong>{formatDistance(distanceAlongRoute(gps.points))}</strong></div><div><span>Distância restante</span><strong>—</strong></div><div><span>Altitude GPS</span><strong>{gps.altitude == null ? '—' : `${Math.round(gps.altitude)} m`}</strong></div><div><span>Velocidade GPS</span><strong>{gps.speed == null ? '—' : `${(gps.speed * 3.6).toFixed(1)} km/h`}</strong></div></div><div className="route-disclaimer">Distância restante indisponível sem um traçado GPX oficial verificado.</div><div className="tracking-controls"><button type="button" className="pause-button" onClick={gps.pause}>{gps.paused ? <Play size={15} /> : <Pause size={15} />}{gps.paused ? 'Retomar' : 'Pausar'}</button><button type="button" className="finish-button" onClick={endWalk}><StopCircle size={16} /> Terminar</button></div></> : <><div className="map-trail-stats"><span><Footprints size={15} />{selectedTrail ? `${selectedTrail.distance} km · estimados` : 'Traçado GPS real'}</span><span><Clock3 size={15} />{selectedTrail ? `${selectedTrail.duration} · estimada` : 'Tempo em movimento'}</span></div><div className="route-disclaimer">{selectedTrail ? 'Traçado GPS oficial ainda não disponível. O marcador indica uma localização aproximada; não representa a rota.' : 'A tua trajetória aparece no mapa assim que o GPS registar pontos.'}</div><button type="button" className="primary-button full-button" onClick={() => beginTrail(selectedTrail)}><Navigation size={15} /> Iniciar com GPS</button></>}
+                {gps.tracking ? <><div className="tracking-metrics"><div><span>Tempo decorrido</span><strong>{formatTime(gps.elapsed)}</strong></div><div><span>Distância percorrida</span><strong>{formatDistance(distanceAlongRoute(gps.points))}</strong></div><div><span>Distância restante</span><strong>—</strong></div><div><span>Altitude GPS</span><strong>{gps.altitude == null ? '—' : `${Math.round(gps.altitude)} m`}</strong></div><div><span>Velocidade GPS</span><strong>{gps.speed == null ? '—' : `${(gps.speed * 3.6).toFixed(1)} km/h`}</strong></div></div><div className="route-disclaimer">Distância restante indisponível sem um traçado GPX oficial verificado.</div><div className="tracking-controls"><button type="button" className="pause-button" onClick={gps.pause}>{gps.paused ? <Play size={15} /> : <Pause size={15} />}{gps.paused ? 'Retomar' : 'Pausar'}</button><button type="button" className="finish-button" onClick={endWalk}><StopCircle size={16} /> Terminar</button></div></> : <><div className="map-trail-stats"><span><Footprints size={15} />{selectedTrail ? `${selectedTrail.distance} km · estimados` : 'Traçado GPS real'}</span><span><Clock3 size={15} />{selectedTrail ? `${selectedTrail.duration} · estimada` : 'Tempo em movimento'}</span></div><label className="activity-type-select"><span>Modalidade da atividade</span><select value={activityType} onChange={(event) => setActivityType(event.target.value)}>{activityTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}</select></label><div className="route-disclaimer">{selectedTrail ? 'Traçado GPS oficial ainda não disponível. O marcador indica uma localização aproximada; não representa a rota.' : 'A tua trajetória aparece no mapa assim que o GPS registar pontos.'}</div><button type="button" className="primary-button full-button" onClick={() => beginTrail(selectedTrail)}><Navigation size={15} /> Iniciar com GPS</button></>}
                 {gps.error && <div className="inline-error" role="status">{gps.error}</div>}
                 <div className="map-panel-footer"><ShieldAlert size={14} /> Estado oficial: consultar fonte oficial.</div>
               </aside></div>
               <div className="map-trails-row"><div className="section-title-row"><div><span className="section-kicker">Pontos na ilha</span><h2>Trilhos para explorar</h2></div></div><div className="map-trail-list">{trails.map((trail) => <button type="button" className={`map-trail-chip ${selectedTrail?.id === trail.id ? 'selected' : ''}`} key={trail.id} onClick={() => setSelectedTrail(trail)}><span>{trail.code}</span>{trail.name}<ArrowRight size={14} /></button>)}</div></div>
             </section>}
 
+            {page === 'game' && <GameHub activities={activities} onStartActivity={(type = activityType) => { setActivityType(type); setSelectedTrail(null); setPage('map') }} />}
+
             {page === 'activities' && <section className="activities-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu caminho</span><h1>Cada passo conta.</h1><p>As caminhadas ficam guardadas apenas neste dispositivo.</p></div><span className="subpage-mark"><Activity size={23} /></span></div>{gps.tracking && <div className="activity-live"><span className="live-dot" /><div><strong>Caminhada em curso</strong><small>{formatTime(gps.elapsed)} · {formatDistance(distanceAlongRoute(gps.points))}</small></div><button type="button" onClick={() => setPage('map')}>Abrir mapa <ArrowRight size={14} /></button></div>}
               {isSaving && <div className="saved-banner"><Check size={17} /> Caminhada guardada neste dispositivo.<button type="button" onClick={() => setIsSaving(false)} aria-label="Fechar"><X size={15} /></button></div>}
               {activities.length > 0 ? <><div className="activity-summary"><div><span>Total de caminhadas</span><strong>{activities.length}</strong></div><div><span>Distância registada</span><strong>{(activities.reduce((sum, item) => sum + (item.distance || 0), 0) / 1000).toFixed(1)} <small>km</small></strong></div><div><span>Tempo em movimento</span><strong>{Math.floor(activities.reduce((sum, item) => sum + (item.elapsed || 0), 0) / 60)} <small>min</small></strong></div></div><div className="activity-list">{activities.map((activity) => <article className="activity-card" key={activity.id}><span className="activity-icon"><Footprints size={19} /></span><div className="activity-card-main"><strong>{activity.trailName}</strong><span>{new Date(activity.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div><div className="activity-result"><strong>{formatDistance(activity.distance)}</strong><span>{formatTime(activity.elapsed)}</span></div></article>)}</div></> : <div className="empty-state activity-empty"><span className="empty-illustration"><Mountain size={30} /></span><h2>O primeiro caminho é teu.</h2><p>Inicia uma caminhada para guardar o trajeto, a distância e o tempo no teu dispositivo.</p><button type="button" className="primary-button" onClick={() => setPage('explore')}><Compass size={16} /> Encontrar um trilho</button></div>}
               <p className="privacy-note"><ShieldAlert size={14} /> Atividades guardadas localmente. Não são enviadas para um servidor.</p></section>}
 
-            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section"><div className="section-title-row"><div><span className="section-kicker">A tua conta</span><h2>Sem conta, por agora.</h2></div></div><p className="profile-copy">Este perfil começa neste dispositivo e sem login. Seguidores, avaliações sincronizadas e perfis públicos dependem de uma futura API; não simulamos utilizadores ou atividade social.</p><div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div></section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
+            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section">
+  {authStatus === 'authenticated' ? <>
+    <div className="section-title-row">
+      <div><span className="section-kicker">A tua conta</span><h2>{authUser?.username || 'Caminheiro'}</h2></div>
+      <button className="auth-logout" type="button" onClick={signOut}>Terminar sessão</button>
+    </div>
+    <p className="profile-copy">Sessão iniciada. O teu acesso ao Madeira Quest e a sincronização do progresso estão associados a esta conta.</p>
+    <div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div>
+  </> : <>
+    <div className="section-title-row">
+      <div><span className="section-kicker">A tua conta é opcional</span><h2>Estás a explorar como visitante.</h2></div>
+    </div>
+    <p className="profile-copy">Podes consultar trilhos e usar o mapa sem criar conta nem instalar a aplicação. A conta é necessária apenas para funcionalidades online do Madeira Quest.</p>
+    {authStatus === 'checking' ? <p className="profile-copy" role="status">A verificar se já tens uma sessão ativa…</p> : <>
+      <div className="auth-tabs" role="tablist" aria-label="Acesso à conta Madeira Trails">
+        <button type="button" role="tab" aria-selected={authMode === 'login'} className={authMode === 'login' ? 'active' : ''} onClick={() => { setAuthMode('login'); setAuthError('') }}>Iniciar sessão</button>
+        <button type="button" role="tab" aria-selected={authMode === 'register'} className={authMode === 'register' ? 'active' : ''} onClick={() => { setAuthMode('register'); setAuthError('') }}>Criar conta</button>
+      </div>
+      <form className="auth-form" onSubmit={submitAuth}>
+        <label>Nome de jogador<input autoComplete="username" value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" required placeholder="Ex.: caminheiro_01" /></label>
+        <label>Palavra-passe<input type="password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} minLength={12} maxLength={128} required placeholder="Mínimo de 12 caracteres" /></label>
+        {authMode === 'register' && <p className="auth-hint">Nome: 3–20 letras, números ou _. Palavra-passe: pelo menos 12 caracteres.</p>}
+        {authError && <p className="auth-message error" role="alert">{authError}</p>}
+        <button className="auth-submit" type="submit" disabled={authBusy}>{authBusy ? 'A validar…' : authMode === 'register' ? 'Criar conta' : 'Iniciar sessão'} <ArrowRight size={17} /></button>
+      </form>
+    </>}
+  </>}
+  <div className="profile-install-panel">
+    <div><strong>Instalação opcional</strong><p>O site funciona diretamente no navegador. Não precisas de instalar a aplicação para explorar os trilhos.</p></div>
+    {installPrompt && <button className="install-profile-button" type="button" onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null) }}>Instalar aplicação</button>}
+  </div>
+</section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
           </>}
         </main>
       </div>
