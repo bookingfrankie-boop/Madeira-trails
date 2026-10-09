@@ -12,6 +12,8 @@ The API is served by the same Node process as the built Vite site. It uses the e
 - `POST /api/auth/register` and `POST /api/auth/login`: username/password authentication; sessions are random tokens stored as SHA-256 hashes and delivered in HttpOnly SameSite cookies. Passwords use Node scrypt.
 - `GET /api/auth/me`, `POST /api/auth/logout`.
 - `GET /api/game/state`: player stats, global top 20, and activity totals by zone.
+- `GET /api/account/export`: exports the player's account identifier, username, and saved activity aggregates as JSON.
+- `DELETE /api/auth/account`: requires the current password and deletes the account, sessions, and associated global activities.
 - `POST /api/activities`: validates the activity against the Madeira-island bounding box and speed/duration thresholds; computes distance from GPS samples server-side; stores only aggregates and sample count, never the raw GPS route.
 - `GET /api/health`: checks database connectivity.
 
