@@ -10,6 +10,7 @@ async function request(path, options = {}) {
 }
 
 export const gameApi = {
+  health: () => request('/api/health'),
   me: () => request('/api/auth/me'),
   register: (username, password) => request('/api/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
   login: (username, password) => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
