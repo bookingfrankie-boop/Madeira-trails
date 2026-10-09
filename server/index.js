@@ -174,6 +174,24 @@ async function handleApi(req, res, url) {
   }
   const user = await currentUser(req)
   if (!user) return send(res, 401, { error: 'Inicia sessão para aceder ao modo global.' })
+  if (req.method === 'GET' && url.pathname === '/api/account/export') {
+    const result = await pool.query('SELECT id, activity_type, zone_id, trail_id, distance_m, duration_s, xp_awarded, route_sample_count, created_at FROM game_activities WHERE user_id = $1 ORDER BY created_at DESC', [user.id])
+    return send(res, 200, {
+      exportedAt: new Date().toISOString(),
+      account: { id: user.id, username: user.username },
+      activities: result.rows,
+      note: 'As rotas GPS brutas não são guardadas; este ficheiro contém apenas os agregados de atividade.',
+    }, { 'Content-Disposition': 'attachment; filename="madeira-quest-export.json"' })
+  }
+  if (req.method === 'DELETE' && url.pathname === '/api/auth/account') {
+    const body = await readJson(req)
+    const result = await pool.query('SELECT password_hash FROM game_users WHERE id = $1', [user.id])
+    if (!result.rows[0] || !(await verifyPassword(String(body.password || ''), result.rows[0].password_hash))) {
+      return send(res, 401, { error: 'Palavra-passe incorreta. A conta não foi apagada.' })
+    }
+    await pool.query('DELETE FROM game_users WHERE id = $1', [user.id])
+    return send(res, 200, { ok: true, message: 'Conta e dados associados apagados.' }, { 'Set-Cookie': cookieHeader('', 0) })
+  }
   if (req.method === 'GET' && url.pathname === '/api/game/state') return send(res, 200, await gameState(user))
   if (req.method === 'POST' && url.pathname === '/api/activities') {
     const body = await readJson(req)
