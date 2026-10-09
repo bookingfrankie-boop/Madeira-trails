@@ -22,7 +22,6 @@ export const gameApi = {
       activityType: activity.activityType || 'walking',
       trailId: activity.trailCode || null,
       elapsed: activity.elapsed,
-      startedAt: activity.date || null,
       points: activity.points || [],
     }),
   }),
