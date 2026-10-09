@@ -73,7 +73,7 @@ function rateLimit(req, res) {
   const current = rateBuckets.get(ip)
   if (!current || now - current.start > 60_000) rateBuckets.set(ip, { start: now, count: 1 })
   else current.count += 1
-  if (rateBuckets.get(ip).count > 30) {
+  if (rateBuckets.get(ip).count > 120) {
     send(res, 429, { error: 'Demasiados pedidos. Tenta novamente dentro de um minuto.' }, { 'Retry-After': '60' })
     return false
   }
@@ -162,8 +162,9 @@ function nearestZone(points) {
 }
 
 async function gameState(user) {
-  const [mine, board, zones] = await Promise.all([
+  const [mine, totals, board, zones] = await Promise.all([
     pool.query('SELECT id, activity_type, zone_id, trail_id, distance_m, duration_s, xp_awarded, created_at FROM game_activities WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100', [user.id]),
+    pool.query('SELECT COALESCE(SUM(xp_awarded), 0)::int AS xp, COUNT(*)::int AS activities, COALESCE(SUM(distance_m), 0)::int AS distance_m FROM game_activities WHERE user_id = $1', [user.id]),
     pool.query(`SELECT u.username, COALESCE(SUM(a.xp_awarded), 0)::int AS xp, COUNT(a.id)::int AS activities
       FROM game_users u LEFT JOIN game_activities a ON a.user_id = u.id
       GROUP BY u.id, u.username ORDER BY xp DESC, activities DESC, u.username ASC LIMIT 20`),
@@ -172,10 +173,10 @@ async function gameState(user) {
       WHERE a2.zone_id = z.id GROUP BY u.id, u.username ORDER BY SUM(a2.xp_awarded) DESC, u.username ASC LIMIT 1) AS leading_player
       FROM game_zones z LEFT JOIN game_activities a ON a.zone_id = z.id GROUP BY z.id, z.name ORDER BY z.name`),
   ])
-  const totalXp = mine.rows.reduce((sum, activity) => sum + activity.xp_awarded, 0)
+  const totalXp = totals.rows[0].xp
   return {
     user: { id: user.id, username: user.username },
-    stats: { xp: totalXp, level: Math.floor(totalXp / 250) + 1, activities: mine.rows.length, distanceMeters: mine.rows.reduce((sum, a) => sum + a.distance_m, 0) },
+    stats: { xp: totalXp, level: Math.floor(totalXp / 250) + 1, activities: totals.rows[0].activities, distanceMeters: totals.rows[0].distance_m },
     activities: mine.rows,
     leaderboard: board.rows,
     zones: zones.rows,
@@ -192,7 +193,7 @@ async function handleApi(req, res, url) {
   }
   if (req.method === 'POST' && ['/api/auth/register', '/api/auth/login'].includes(url.pathname)) {
     const body = await readJson(req)
-    const username = String(body.username || '').trim()
+    const username = String(body.username || '').trim().toLowerCase()
     const password = String(body.password || '')
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return send(res, 400, { error: 'O nome de jogador deve ter 3–20 caracteres: letras, números ou _.' })
     if (password.length < 12 || password.length > 128) return send(res, 400, { error: 'A palavra-passe deve ter entre 12 e 128 caracteres.' })
