@@ -22,7 +22,8 @@ export function getGameStats(activities = []) {
   const totalMeters = activities.reduce((sum, activity) => sum + Math.max(0, Number(activity.distance) || 0), 0)
   const totalSeconds = activities.reduce((sum, activity) => sum + Math.max(0, Number(activity.elapsed) || 0), 0)
   const distinctTrails = new Set(activities.map((activity) => activity.trailCode).filter(Boolean))
-  const distinctTypes = new Set(activities.map((activity) => activity.activityType || 'walking'))
+  const allowedTypes = new Set(activityTypes.map((type) => type.id))
+  const distinctTypes = new Set(activities.map((activity) => activity.activityType || 'walking').filter((type) => allowedTypes.has(type)))
   const baseXp = Math.floor(totalMeters / 100) + activities.length * 25 + distinctTrails.size * 15
   const missions = [
     { id: 'first-session', title: 'Primeiro passo', description: 'Termina a tua primeira atividade', target: 1, progress: Math.min(activities.length, 1), reward: 30, done: activities.length >= 1, value: activities.length, unit: 'atividade' },
