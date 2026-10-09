@@ -12,6 +12,7 @@ const icons = { walking: Footprints, running: Activity, cycling: Bike, hiking: M
 export default function GameHub({ activities, onStartActivity }) {
   const stats = getGameStats(activities)
   const [user, setUser] = useState(null)
+  const [apiStatus, setApiStatus] = useState('checking')
   const [globalState, setGlobalState] = useState(null)
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
@@ -28,12 +29,19 @@ export default function GameHub({ activities, onStartActivity }) {
 
   useEffect(() => {
     let active = true
-    gameApi.me().then(async ({ user: currentUser }) => {
+    gameApi.health().then(async () => {
       if (!active) return
-      setUser(currentUser)
-      const result = await gameApi.state()
-      if (active) setGlobalState(result)
-    }).catch(() => {})
+      setApiStatus('ready')
+      try {
+        const { user: currentUser } = await gameApi.me()
+        if (!active) return
+        setUser(currentUser)
+        const result = await gameApi.state()
+        if (active) setGlobalState(result)
+      } catch { /* no active session */ }
+    }).catch(() => {
+      if (active) setApiStatus('offline')
+    })
     return () => { active = false }
   }, [])
 
@@ -47,6 +55,7 @@ export default function GameHub({ activities, onStartActivity }) {
         ? await gameApi.register(username, password)
         : await gameApi.login(username, password)
       setUser(result.user)
+      setApiStatus('ready')
       setPassword('')
       await refreshGlobal()
       setNotice(mode === 'register' ? 'Conta criada. Já podes participar no jogo da ilha.' : 'Sessão iniciada.')
@@ -168,6 +177,10 @@ export default function GameHub({ activities, onStartActivity }) {
             <p className="game-muted">A sincronização envia os pontos GPS apenas para validação temporária. O servidor guarda distância, duração e zona, não a rota GPS bruta.</p>
             {globalState && <div className="game-online-stats"><div><span>XP global</span><strong>{globalState.stats.xp}</strong></div><div><span>Atividades válidas</span><strong>{globalState.stats.activities}</strong></div><div><span>Distância validada</span><strong>{formatDistance(globalState.stats.distanceMeters)}</strong></div></div>}
           </div>
+        ) : apiStatus === 'checking' ? (
+          <div className="game-empty-online">A verificar a ligação ao servidor multiplayer…</div>
+        ) : apiStatus === 'offline' ? (
+          <div className="game-offline-panel"><ShieldCheck size={20} /><div><strong>Modo global ainda não configurado</strong><p>O jogo local funciona. Para ativar contas, classificações e sincronização, é necessário ligar o serviço web ao PostgreSQL já existente no Railway. Ainda não foi feita qualquer alteração à infraestrutura.</p></div></div>
         ) : (
           <form className="game-auth-form" onSubmit={handleAuth}>
             <div className="game-auth-intro"><LockKeyhole size={18} /><div><strong>Entra no jogo global</strong><p>Cria um nome de jogador e participa na classificação partilhada. A palavra-passe tem de ter pelo menos 12 caracteres.</p></div></div>
