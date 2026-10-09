@@ -241,36 +241,6 @@ export default function App() {
     setComment('')
   }
 
-  if (authStatus === 'checking') {
-    return <main className="auth-screen"><div className="auth-card auth-loading"><span className="auth-mark"><Mountain size={28} /></span><p>A validar a tua sessão...</p></div></main>
-  }
-
-  if (authStatus !== 'authenticated') {
-    return (
-      <main className="auth-screen">
-        <section className="auth-card">
-          <div className="auth-brand"><span className="auth-mark"><Mountain size={28} /></span><span><strong>MADEIRA</strong><small>TRAILS</small></span></div>
-          <span className="auth-kicker">A ILHA, À TUA ESCALA</span>
-          <h1>{authMode === 'register' ? 'Cria a tua conta.' : 'O teu próximo caminho começa aqui.'}</h1>
-          <p className="auth-intro">{authMode === 'register' ? 'Regista-te para guardar o teu progresso e entrar no jogo da ilha.' : 'Entra na tua conta para aceder aos trilhos, mapa, atividades e Madeira Quest.'}</p>
-          <div className="auth-tabs" role="tablist" aria-label="Acesso à conta">
-            <button type="button" role="tab" aria-selected={authMode === 'login'} className={authMode === 'login' ? 'active' : ''} onClick={() => { setAuthMode('login'); setAuthError('') }}>Iniciar sessão</button>
-            <button type="button" role="tab" aria-selected={authMode === 'register'} className={authMode === 'register' ? 'active' : ''} onClick={() => { setAuthMode('register'); setAuthError('') }}>Criar conta</button>
-          </div>
-          <form className="auth-form" onSubmit={submitAuth}>
-            <label>Nome de jogador<input autoComplete="username" value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" required placeholder="Ex.: caminheiro_01" /></label>
-            <label>Palavra-passe<input type="password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} minLength={12} maxLength={128} required placeholder="Mínimo de 12 caracteres" /></label>
-            {authMode === 'register' && <p className="auth-hint">Nome: 3–20 letras, números ou _. Palavra-passe: pelo menos 12 caracteres.</p>}
-            {authError && <p className="auth-message error" role="alert">{authError}</p>}
-            <button className="auth-submit" type="submit" disabled={authBusy}>{authBusy ? 'A validar...' : authMode === 'register' ? 'Criar conta e continuar' : 'Entrar na aplicação'} <ArrowRight size={17} /></button>
-          </form>
-          <p className="auth-install-copy">Usa o Madeira Trails diretamente no navegador. Depois de entrares, podes também instalar a aplicação no dispositivo, se estiver disponível.</p>
-          <p className="auth-privacy">A tua conta dá acesso ao jogo e à sincronização do progresso. Nunca partilhes a tua palavra-passe.</p>
-        </section>
-      </main>
-    )
-  }
-
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -281,7 +251,7 @@ export default function App() {
       </aside>
 
       <div className="app-main">
-        <header className="topbar"><button className="mobile-brand" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><span className="brand-mark"><Mountain size={18} /></span> MADEIRA TRAILS</button><div className="topbar-location"><MapPin size={14} /> Ilha da Madeira <span>·</span> Portugal</div><div className="topbar-actions">{installPrompt && <button className="install-button" type="button" onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null) }}>Instalar aplicação</button>}<button className="topbar-icon" type="button" onClick={() => setPage('profile')} aria-label="Perfil"><Mountain size={17} /></button></div></header>
+        <header className="topbar"><button className="mobile-brand" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><span className="brand-mark"><Mountain size={18} /></span> MADEIRA TRAILS</button><div className="topbar-location"><MapPin size={14} /> Ilha da Madeira <span>·</span> Portugal</div><div className="topbar-actions"><button className="topbar-icon" type="button" onClick={() => setPage('profile')} aria-label="Perfil"><Mountain size={17} /></button></div></header>
 
         <main className="workspace">
           {selectedTrail && page === 'explore' ? <TrailDetail trail={selectedTrail} onBack={() => setSelectedTrail(null)} onStart={() => beginTrail(selectedTrail)} onLike={() => updateCommunity(selectedTrail.id, { liked: !community[selectedTrail.id]?.liked })} liked={!!community[selectedTrail.id]?.liked} comment={comment} setComment={setComment} onComment={onAddComment} onPhoto={onAddPhoto} photos={community[selectedTrail.id]?.photos ?? []} comments={community[selectedTrail.id]?.comments ?? []} rating={community[selectedTrail.id]?.rating ?? 0} onRate={(rating) => updateCommunity(selectedTrail.id, { rating })} /> : <>
@@ -313,7 +283,38 @@ export default function App() {
               {activities.length > 0 ? <><div className="activity-summary"><div><span>Total de caminhadas</span><strong>{activities.length}</strong></div><div><span>Distância registada</span><strong>{(activities.reduce((sum, item) => sum + (item.distance || 0), 0) / 1000).toFixed(1)} <small>km</small></strong></div><div><span>Tempo em movimento</span><strong>{Math.floor(activities.reduce((sum, item) => sum + (item.elapsed || 0), 0) / 60)} <small>min</small></strong></div></div><div className="activity-list">{activities.map((activity) => <article className="activity-card" key={activity.id}><span className="activity-icon"><Footprints size={19} /></span><div className="activity-card-main"><strong>{activity.trailName}</strong><span>{new Date(activity.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div><div className="activity-result"><strong>{formatDistance(activity.distance)}</strong><span>{formatTime(activity.elapsed)}</span></div></article>)}</div></> : <div className="empty-state activity-empty"><span className="empty-illustration"><Mountain size={30} /></span><h2>O primeiro caminho é teu.</h2><p>Inicia uma caminhada para guardar o trajeto, a distância e o tempo no teu dispositivo.</p><button type="button" className="primary-button" onClick={() => setPage('explore')}><Compass size={16} /> Encontrar um trilho</button></div>}
               <p className="privacy-note"><ShieldAlert size={14} /> Atividades guardadas localmente. Não são enviadas para um servidor.</p></section>}
 
-            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section"><div className="section-title-row"><div><span className="section-kicker">A tua conta</span><h2>{authUser?.username || "Caminheiro"}</h2></div><button className="auth-logout" type="button" onClick={signOut}>Terminar sessão</button></div><p className="profile-copy">Sessão iniciada. O acesso ao Madeira Quest e à sincronização de atividades está associado à tua conta.</p><div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div></section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
+            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section">
+  {authStatus === 'authenticated' ? <>
+    <div className="section-title-row">
+      <div><span className="section-kicker">A tua conta</span><h2>{authUser?.username || 'Caminheiro'}</h2></div>
+      <button className="auth-logout" type="button" onClick={signOut}>Terminar sessão</button>
+    </div>
+    <p className="profile-copy">Sessão iniciada. O teu acesso ao Madeira Quest e a sincronização do progresso estão associados a esta conta.</p>
+    <div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div>
+  </> : <>
+    <div className="section-title-row">
+      <div><span className="section-kicker">A tua conta é opcional</span><h2>Estás a explorar como visitante.</h2></div>
+    </div>
+    <p className="profile-copy">Podes consultar trilhos e usar o mapa sem criar conta nem instalar a aplicação. A conta é necessária apenas para funcionalidades online do Madeira Quest.</p>
+    {authStatus === 'checking' ? <p className="profile-copy" role="status">A verificar se já tens uma sessão ativa…</p> : <>
+      <div className="auth-tabs" role="tablist" aria-label="Acesso à conta Madeira Trails">
+        <button type="button" role="tab" aria-selected={authMode === 'login'} className={authMode === 'login' ? 'active' : ''} onClick={() => { setAuthMode('login'); setAuthError('') }}>Iniciar sessão</button>
+        <button type="button" role="tab" aria-selected={authMode === 'register'} className={authMode === 'register' ? 'active' : ''} onClick={() => { setAuthMode('register'); setAuthError('') }}>Criar conta</button>
+      </div>
+      <form className="auth-form" onSubmit={submitAuth}>
+        <label>Nome de jogador<input autoComplete="username" value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" required placeholder="Ex.: caminheiro_01" /></label>
+        <label>Palavra-passe<input type="password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} minLength={12} maxLength={128} required placeholder="Mínimo de 12 caracteres" /></label>
+        {authMode === 'register' && <p className="auth-hint">Nome: 3–20 letras, números ou _. Palavra-passe: pelo menos 12 caracteres.</p>}
+        {authError && <p className="auth-message error" role="alert">{authError}</p>}
+        <button className="auth-submit" type="submit" disabled={authBusy}>{authBusy ? 'A validar…' : authMode === 'register' ? 'Criar conta' : 'Iniciar sessão'} <ArrowRight size={17} /></button>
+      </form>
+    </>}
+  </>}
+  <div className="profile-install-panel">
+    <div><strong>Instalação opcional</strong><p>O site funciona diretamente no navegador. Não precisas de instalar a aplicação para explorar os trilhos.</p></div>
+    {installPrompt && <button className="install-profile-button" type="button" onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null) }}>Instalar aplicação</button>}
+  </div>
+</section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
           </>}
         </main>
       </div>
