@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import GameHub from './components/GameHub.jsx'
+import { activityTypes } from './game/gameEngine.js'
 import {
   Activity, ArrowLeft, ArrowRight, ArrowUpRight, Camera, Check,
   ChevronDown, Clock3, Compass, Footprints, Heart, LocateFixed, Map as MapIcon,
   MapPin, Mountain, Navigation, Pause, Play, Search, Share2,
-  ShieldAlert, SlidersHorizontal, Star, StopCircle, Trees, Upload, X,
+  ShieldAlert, SlidersHorizontal, Star, StopCircle, Trees, Upload, X, Gamepad2,
 } from 'lucide-react'
 const MapCanvas = lazy(() => import('./components/TrailMap.jsx'))
 
@@ -23,6 +25,7 @@ const tabs = [
   { id: 'explore', label: 'Explorar', icon: Compass },
   { id: 'map', label: 'Mapa', icon: MapIcon },
   { id: 'activities', label: 'Atividades', icon: Footprints },
+  { id: 'game', label: 'Jogo', icon: Gamepad2 },
   { id: 'profile', label: 'Perfil', icon: Mountain },
 ]
 
@@ -112,6 +115,7 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [selectedTrail, setSelectedTrail] = useState(null)
   const [activities, setActivities] = useState(getActivities)
+  const [activityType, setActivityType] = useState('walking')
   const [community, setCommunity] = useState(() => {
     try { return JSON.parse(localStorage.getItem('madeira-trails:community') || '{}') } catch { return {} }
   })
@@ -152,6 +156,8 @@ export default function App() {
       id: crypto.randomUUID(),
       trailName: selectedTrail?.name ?? 'Caminhada livre',
       trailCode: selectedTrail?.code ?? null,
+      municipality: selectedTrail?.municipality ?? null,
+      activityType,
       date: new Date().toISOString(),
       distance: result.distance,
       elapsed: result.elapsed,
@@ -217,12 +223,14 @@ export default function App() {
 
             {page === 'map' && <section className="map-page"><div className="map-page-heading"><div><button className="back-link" type="button" onClick={() => { setPage('explore'); setSelectedTrail(null) }}><ArrowLeft size={14} /> Descobrir</button><span className="section-kicker">Cartografia · OpenStreetMap</span><h1>{selectedTrail ? selectedTrail.name : 'A ilha, à tua escala.'}</h1><p>{selectedTrail ? `${selectedTrail.code} · ${selectedTrail.start} → ${selectedTrail.end}` : 'Explora a Ilha da Madeira e encontra o teu caminho.'}</p></div><span className="map-live-status"><span className="condition-dot" />{gps.tracking ? gps.paused ? 'EM PAUSA' : 'GPS ATIVO' : 'GPS DESLIGADO'}</span></div>
               <div className="map-layout"><div className="map-frame"><TrailMap trail={selectedTrail} position={gps.position} points={gps.points} onLocate={locateAndShow} onStart={() => beginTrail(selectedTrail)} tracking={gps.tracking} paused={gps.paused} /></div><aside className="map-panel"><span className="section-kicker">{gps.tracking ? gps.paused ? 'Em descanso' : 'Caminhada em curso' : 'Caminhada'}</span><h2>{gps.tracking ? selectedTrail?.name ?? 'Caminhada livre' : selectedTrail?.name ?? 'Pronto a partir?'}</h2><p>{selectedTrail ? `${selectedTrail.start} até ${selectedTrail.end}` : 'Regista uma caminhada com GPS. O percurso e as métricas ficam guardados neste dispositivo.'}</p>
-                {gps.tracking ? <><div className="tracking-metrics"><div><span>Tempo decorrido</span><strong>{formatTime(gps.elapsed)}</strong></div><div><span>Distância percorrida</span><strong>{formatDistance(distanceAlongRoute(gps.points))}</strong></div><div><span>Distância restante</span><strong>—</strong></div><div><span>Altitude GPS</span><strong>{gps.altitude == null ? '—' : `${Math.round(gps.altitude)} m`}</strong></div><div><span>Velocidade GPS</span><strong>{gps.speed == null ? '—' : `${(gps.speed * 3.6).toFixed(1)} km/h`}</strong></div></div><div className="route-disclaimer">Distância restante indisponível sem um traçado GPX oficial verificado.</div><div className="tracking-controls"><button type="button" className="pause-button" onClick={gps.pause}>{gps.paused ? <Play size={15} /> : <Pause size={15} />}{gps.paused ? 'Retomar' : 'Pausar'}</button><button type="button" className="finish-button" onClick={endWalk}><StopCircle size={16} /> Terminar</button></div></> : <><div className="map-trail-stats"><span><Footprints size={15} />{selectedTrail ? `${selectedTrail.distance} km · estimados` : 'Traçado GPS real'}</span><span><Clock3 size={15} />{selectedTrail ? `${selectedTrail.duration} · estimada` : 'Tempo em movimento'}</span></div><div className="route-disclaimer">{selectedTrail ? 'Traçado GPS oficial ainda não disponível. O marcador indica uma localização aproximada; não representa a rota.' : 'A tua trajetória aparece no mapa assim que o GPS registar pontos.'}</div><button type="button" className="primary-button full-button" onClick={() => beginTrail(selectedTrail)}><Navigation size={15} /> Iniciar com GPS</button></>}
+                {gps.tracking ? <><div className="tracking-metrics"><div><span>Tempo decorrido</span><strong>{formatTime(gps.elapsed)}</strong></div><div><span>Distância percorrida</span><strong>{formatDistance(distanceAlongRoute(gps.points))}</strong></div><div><span>Distância restante</span><strong>—</strong></div><div><span>Altitude GPS</span><strong>{gps.altitude == null ? '—' : `${Math.round(gps.altitude)} m`}</strong></div><div><span>Velocidade GPS</span><strong>{gps.speed == null ? '—' : `${(gps.speed * 3.6).toFixed(1)} km/h`}</strong></div></div><div className="route-disclaimer">Distância restante indisponível sem um traçado GPX oficial verificado.</div><div className="tracking-controls"><button type="button" className="pause-button" onClick={gps.pause}>{gps.paused ? <Play size={15} /> : <Pause size={15} />}{gps.paused ? 'Retomar' : 'Pausar'}</button><button type="button" className="finish-button" onClick={endWalk}><StopCircle size={16} /> Terminar</button></div></> : <><div className="map-trail-stats"><span><Footprints size={15} />{selectedTrail ? `${selectedTrail.distance} km · estimados` : 'Traçado GPS real'}</span><span><Clock3 size={15} />{selectedTrail ? `${selectedTrail.duration} · estimada` : 'Tempo em movimento'}</span></div><label className="activity-type-select"><span>Modalidade da atividade</span><select value={activityType} onChange={(event) => setActivityType(event.target.value)}>{activityTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}</select></label><div className="route-disclaimer">{selectedTrail ? 'Traçado GPS oficial ainda não disponível. O marcador indica uma localização aproximada; não representa a rota.' : 'A tua trajetória aparece no mapa assim que o GPS registar pontos.'}</div><button type="button" className="primary-button full-button" onClick={() => beginTrail(selectedTrail)}><Navigation size={15} /> Iniciar com GPS</button></>}
                 {gps.error && <div className="inline-error" role="status">{gps.error}</div>}
                 <div className="map-panel-footer"><ShieldAlert size={14} /> Estado oficial: consultar fonte oficial.</div>
               </aside></div>
               <div className="map-trails-row"><div className="section-title-row"><div><span className="section-kicker">Pontos na ilha</span><h2>Trilhos para explorar</h2></div></div><div className="map-trail-list">{trails.map((trail) => <button type="button" className={`map-trail-chip ${selectedTrail?.id === trail.id ? 'selected' : ''}`} key={trail.id} onClick={() => setSelectedTrail(trail)}><span>{trail.code}</span>{trail.name}<ArrowRight size={14} /></button>)}</div></div>
             </section>}
+
+            {page === 'game' && <GameHub activities={activities} onStartActivity={(type = activityType) => { setActivityType(type); setSelectedTrail(null); setPage('map') }} />}
 
             {page === 'activities' && <section className="activities-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu caminho</span><h1>Cada passo conta.</h1><p>As caminhadas ficam guardadas apenas neste dispositivo.</p></div><span className="subpage-mark"><Activity size={23} /></span></div>{gps.tracking && <div className="activity-live"><span className="live-dot" /><div><strong>Caminhada em curso</strong><small>{formatTime(gps.elapsed)} · {formatDistance(distanceAlongRoute(gps.points))}</small></div><button type="button" onClick={() => setPage('map')}>Abrir mapa <ArrowRight size={14} /></button></div>}
               {isSaving && <div className="saved-banner"><Check size={17} /> Caminhada guardada neste dispositivo.<button type="button" onClick={() => setIsSaving(false)} aria-label="Fechar"><X size={15} /></button></div>}
