@@ -70,7 +70,7 @@ export default function TrailMap({ trail, position, points, onLocate, onStart, t
     } else {
       instance.flyTo({ center: madeiraCenter, zoom: 9, duration: 650 })
     }
-  }, [trail]
+  }, [trail])
 
   useEffect(() => {
     const instance = map.current
