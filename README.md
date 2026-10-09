@@ -50,6 +50,21 @@ public/
 
 O `railway.json` define build e start para o serviço web. O processo de produção escuta em `0.0.0.0:$PORT`. Liga o repositório no Railway e publica o serviço; não são necessárias variáveis ou bases de dados nesta fase.
 
+
+## Madeira Quest — protótipo de jogo
+
+A aplicação inclui uma primeira interface de progressão local para o jogo Madeira Quest. O único território jogável planeado é a ilha da Madeira (dez municípios); Porto Santo e outras regiões ficam fora do mapa do jogo. As modalidades disponíveis são caminhada, corrida, ciclismo e trilhos/montanha.
+
+Nesta fase, XP, missões e zonas exploradas são calculados no dispositivo a partir das atividades locais. **Não existe ainda multiplayer, contas, classificação global, sincronização entre dispositivos, conquista concorrente de territórios nem validação antifraude no servidor.** As zonas assinaladas como exploradas representam o percurso selecionado na atividade, não uma validação geográfica independente. O protótipo não deve apresentar esses dados como uma competição global real.
+
+Próximas etapas para o modo global:
+1. Definir contas e consentimentos, com recolha mínima de dados e opção para apagar/exportar a conta.
+2. Implementar API e persistência server-side, reutilizando infraestrutura existente apenas após auditoria de configuração, custos e segurança.
+3. Validar atividades no servidor e definir regras transparentes de XP, missões, anti-GPS-spoofing e disputas territoriais.
+4. Criar o mapa de zonas da ilha com limites geográficos licenciados e fontes verificadas.
+5. Tornar a integração Strava opcional e limitada aos dados autorizados; o jogo deve funcionar sem conta Strava.
+6. Testar acessibilidade, segurança física, privacidade de localização e utilização em dispositivos reais antes de qualquer publicação.
+
 ## Próximos passos de produto
 
 1. Validar cada campo do catálogo com IFCN/Visit Madeira e guardar URL, data e proveniência por percurso.
