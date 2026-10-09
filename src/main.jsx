@@ -4,6 +4,7 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './styles.css'
+import './styles/game.css'
 import './styles/nearby.css'
 import './styles/detail.css'
 
