@@ -17,6 +17,7 @@ export default function GameHub({ activities, onStartActivity }) {
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -89,6 +90,47 @@ export default function GameHub({ activities, onStartActivity }) {
       } else {
         setNotice(`${accepted} atividades sincronizadas; ${skipped} já estavam no servidor.`)
       }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function exportMyData() {
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const data = await gameApi.exportData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `madeira-quest-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(objectUrl)
+      setNotice('Exportação dos dados concluída.')
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteMyAccount() {
+    if (!window.confirm('Apagar permanentemente a conta e todas as atividades globais associadas? Esta ação não pode ser anulada.')) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await gameApi.deleteAccount(deletePassword)
+      setUser(null)
+      setGlobalState(null)
+      setDeletePassword('')
+      setNotice('Conta e dados globais apagados. As atividades locais neste dispositivo não foram apagadas.')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -176,6 +218,12 @@ export default function GameHub({ activities, onStartActivity }) {
             <button type="button" className="game-sync-button" disabled={busy || activities.length === 0} onClick={syncActivities}>{busy ? 'A sincronizar…' : `Sincronizar atividades locais (${activities.length})`}</button>
             <p className="game-muted">A sincronização envia os pontos GPS apenas para validação temporária. O servidor guarda distância, duração e zona, não a rota GPS bruta.</p>
             {globalState && <div className="game-online-stats"><div><span>XP global</span><strong>{globalState.stats.xp}</strong></div><div><span>Atividades válidas</span><strong>{globalState.stats.activities}</strong></div><div><span>Distância validada</span><strong>{formatDistance(globalState.stats.distanceMeters)}</strong></div></div>}
+            <div className="game-account-actions">
+              <button type="button" className="game-export-button" disabled={busy} onClick={exportMyData}>Exportar os meus dados</button>
+              <label className="game-delete-label">Confirma a palavra-passe para apagar a conta<input type="password" autoComplete="current-password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} minLength={12} maxLength={128} /></label>
+              <button type="button" className="game-delete-button" disabled={busy || deletePassword.length < 12} onClick={deleteMyAccount}>Apagar conta e dados globais</button>
+              <p className="game-muted">Apagar a conta remove os dados globais e as atividades sincronizadas. As atividades guardadas localmente neste dispositivo são independentes.</p>
+            </div>
           </div>
         ) : apiStatus === 'checking' ? (
           <div className="game-empty-online">A verificar a ligação ao servidor multiplayer…</div>
