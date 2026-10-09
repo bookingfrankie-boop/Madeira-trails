@@ -67,13 +67,14 @@ async function readJson(req) {
   catch { throw Object.assign(new Error('JSON inválido.'), { status: 400 }) }
 }
 
-function rateLimit(req, res) {
+function rateLimit(req, res, limit = 120, scope = 'general') {
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').toString().split(',')[0].trim()
+  const key = `${scope}:${ip}`
   const now = Date.now()
-  const current = rateBuckets.get(ip)
-  if (!current || now - current.start > 60_000) rateBuckets.set(ip, { start: now, count: 1 })
+  const current = rateBuckets.get(key)
+  if (!current || now - current.start > 60_000) rateBuckets.set(key, { start: now, count: 1 })
   else current.count += 1
-  if (rateBuckets.get(ip).count > 120) {
+  if (rateBuckets.get(key).count > limit) {
     send(res, 429, { error: 'Demasiados pedidos. Tenta novamente dentro de um minuto.' }, { 'Retry-After': '60' })
     return false
   }
@@ -192,6 +193,7 @@ async function handleApi(req, res, url) {
     catch { return send(res, 503, { ok: false, database: 'unavailable' }) }
   }
   if (req.method === 'POST' && ['/api/auth/register', '/api/auth/login'].includes(url.pathname)) {
+    if (!rateLimit(req, res, 10, 'auth')) return
     const body = await readJson(req)
     const username = String(body.username || '').trim().toLowerCase()
     const password = String(body.password || '')
