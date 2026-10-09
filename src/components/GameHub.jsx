@@ -16,7 +16,7 @@ export default function GameHub({ activities, onStartActivity }) {
           <span className="game-eyebrow"><Sparkles size={13} /> MADEIRA QUEST · TEMPORADA ZERO</span>
           <h1>A ilha é o teu mundo de jogo.</h1>
           <p>Move-te na Madeira. Completa missões. Sobe de nível. Ajuda a tua comunidade a explorar a ilha.</p>
-          <button type="button" className="game-start-button" onClick={onStartActivity}>Começar atividade <ChevronRight size={16} /></button>
+          <button type="button" className="game-start-button" onClick={() => onStartActivity()}>Começar atividade <ChevronRight size={16} /></button>
         </div>
         <div className="game-level-orb"><span>NÍVEL</span><strong>{stats.level}</strong><small>{stats.xp} XP</small></div>
       </div>
