@@ -19,6 +19,7 @@ function TrailMap(props) {
 import { officialSources, trails } from './data/trails.js'
 import { useGpsTracking } from './hooks/useGpsTracking.js'
 import { getActivities, saveActivity } from './services/activityStorage.js'
+import { gameApi } from './services/gameApi.js'
 import { distanceAlongRoute, distanceBetweenCoordinates } from './utils/geo.js'
 
 const tabs = [
@@ -111,6 +112,13 @@ function TrailDetail({ trail, onBack, onStart, onLike, liked, comment, setCommen
 }
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState('checking')
+  const [authUser, setAuthUser] = useState(null)
+  const [authMode, setAuthMode] = useState('login')
+  const [authUsername, setAuthUsername] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
   const [page, setPage] = useState('explore')
   const [search, setSearch] = useState('')
   const [selectedTrail, setSelectedTrail] = useState(null)
@@ -124,6 +132,16 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const gps = useGpsTracking()
   const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    gameApi.me().then(({ user }) => {
+      if (active) { setAuthUser(user); setAuthStatus('authenticated') }
+    }).catch(() => {
+      if (active) setAuthStatus('unauthenticated')
+    })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     const captureInstall = (event) => { event.preventDefault(); setInstallPrompt(event) }
@@ -187,12 +205,70 @@ export default function App() {
     event.target.value = ''
   }
 
+  const submitAuth = async (event) => {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError('')
+    try {
+      const result = authMode === 'register'
+        ? await gameApi.register(authUsername.trim(), authPassword)
+        : await gameApi.login(authUsername.trim(), authPassword)
+      setAuthUser(result.user)
+      setAuthStatus('authenticated')
+      setAuthPassword('')
+    } catch (error) {
+      setAuthError(error.message || 'Não foi possível validar os dados. Tenta novamente.')
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  const signOut = async () => {
+    try { await gameApi.logout() } catch { /* fecha a interface mesmo se a rede falhar */ }
+    setAuthUser(null)
+    setAuthPassword('')
+    setAuthStatus('unauthenticated')
+    setAuthMode('login')
+    setPage('explore')
+    setSelectedTrail(null)
+  }
+
   const onAddComment = (event) => {
     event.preventDefault()
     if (!comment.trim() || !selectedTrail) return
     const comments = [...(community[selectedTrail.id]?.comments ?? []), { text: comment.trim(), date: new Date().toISOString() }]
     updateCommunity(selectedTrail.id, { comments })
     setComment('')
+  }
+
+  if (authStatus === 'checking') {
+    return <main className="auth-screen"><div className="auth-card auth-loading"><span className="auth-mark"><Mountain size={28} /></span><p>A validar a tua sessão...</p></div></main>
+  }
+
+  if (authStatus !== 'authenticated') {
+    return (
+      <main className="auth-screen">
+        <section className="auth-card">
+          <div className="auth-brand"><span className="auth-mark"><Mountain size={28} /></span><span><strong>MADEIRA</strong><small>TRAILS</small></span></div>
+          <span className="auth-kicker">A ILHA, À TUA ESCALA</span>
+          <h1>{authMode === 'register' ? 'Cria a tua conta.' : 'O teu próximo caminho começa aqui.'}</h1>
+          <p className="auth-intro">{authMode === 'register' ? 'Regista-te para guardar o teu progresso e entrar no jogo da ilha.' : 'Entra na tua conta para aceder aos trilhos, mapa, atividades e Madeira Quest.'}</p>
+          <div className="auth-tabs" role="tablist" aria-label="Acesso à conta">
+            <button type="button" role="tab" aria-selected={authMode === 'login'} className={authMode === 'login' ? 'active' : ''} onClick={() => { setAuthMode('login'); setAuthError('') }}>Iniciar sessão</button>
+            <button type="button" role="tab" aria-selected={authMode === 'register'} className={authMode === 'register' ? 'active' : ''} onClick={() => { setAuthMode('register'); setAuthError('') }}>Criar conta</button>
+          </div>
+          <form className="auth-form" onSubmit={submitAuth}>
+            <label>Nome de jogador<input autoComplete="username" value={authUsername} onChange={(event) => setAuthUsername(event.target.value)} minLength={3} maxLength={20} pattern="[A-Za-z0-9_]{3,20}" required placeholder="Ex.: caminheiro_01" /></label>
+            <label>Palavra-passe<input type="password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} minLength={12} maxLength={128} required placeholder="Mínimo de 12 caracteres" /></label>
+            {authMode === 'register' && <p className="auth-hint">Nome: 3–20 letras, números ou _. Palavra-passe: pelo menos 12 caracteres.</p>}
+            {authError && <p className="auth-message error" role="alert">{authError}</p>}
+            <button className="auth-submit" type="submit" disabled={authBusy}>{authBusy ? 'A validar...' : authMode === 'register' ? 'Criar conta e continuar' : 'Entrar na aplicação'} <ArrowRight size={17} /></button>
+          </form>
+          <p className="auth-install-copy">Usa o Madeira Trails diretamente no navegador. Depois de entrares, podes também instalar a aplicação no dispositivo, se estiver disponível.</p>
+          <p className="auth-privacy">A tua conta dá acesso ao jogo e à sincronização do progresso. Nunca partilhes a tua palavra-passe.</p>
+        </section>
+      </main>
+    )
   }
 
   return (
@@ -237,7 +313,7 @@ export default function App() {
               {activities.length > 0 ? <><div className="activity-summary"><div><span>Total de caminhadas</span><strong>{activities.length}</strong></div><div><span>Distância registada</span><strong>{(activities.reduce((sum, item) => sum + (item.distance || 0), 0) / 1000).toFixed(1)} <small>km</small></strong></div><div><span>Tempo em movimento</span><strong>{Math.floor(activities.reduce((sum, item) => sum + (item.elapsed || 0), 0) / 60)} <small>min</small></strong></div></div><div className="activity-list">{activities.map((activity) => <article className="activity-card" key={activity.id}><span className="activity-icon"><Footprints size={19} /></span><div className="activity-card-main"><strong>{activity.trailName}</strong><span>{new Date(activity.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div><div className="activity-result"><strong>{formatDistance(activity.distance)}</strong><span>{formatTime(activity.elapsed)}</span></div></article>)}</div></> : <div className="empty-state activity-empty"><span className="empty-illustration"><Mountain size={30} /></span><h2>O primeiro caminho é teu.</h2><p>Inicia uma caminhada para guardar o trajeto, a distância e o tempo no teu dispositivo.</p><button type="button" className="primary-button" onClick={() => setPage('explore')}><Compass size={16} /> Encontrar um trilho</button></div>}
               <p className="privacy-note"><ShieldAlert size={14} /> Atividades guardadas localmente. Não são enviadas para um servidor.</p></section>}
 
-            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section"><div className="section-title-row"><div><span className="section-kicker">A tua conta</span><h2>Sem conta, por agora.</h2></div></div><p className="profile-copy">Este perfil começa neste dispositivo e sem login. Seguidores, avaliações sincronizadas e perfis públicos dependem de uma futura API; não simulamos utilizadores ou atividade social.</p><div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div></section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
+            {page === 'profile' && <section className="profile-page subpage"><div className="subpage-heading"><div><span className="section-kicker">O teu espaço</span><h1>Perfil de caminheiro.</h1><p>Uma presença local, pronta para crescer contigo.</p></div><span className="profile-avatar"><Mountain size={26} /></span></div><div className="profile-stats"><div><Footprints size={17} /><strong>{activities.length}</strong><span>caminhadas</span></div><div><MapPin size={17} /><strong>{new Set(activities.map((activity) => activity.trailCode).filter(Boolean)).size}</strong><span>trilhos</span></div><div><Heart size={17} /><strong>{Object.values(community).filter((item) => item.liked).length}</strong><span>favoritos</span></div></div><section className="profile-section"><div className="section-title-row"><div><span className="section-kicker">A tua conta</span><h2>{authUser?.username || "Caminheiro"}</h2></div><button className="auth-logout" type="button" onClick={signOut}>Terminar sessão</button></div><p className="profile-copy">Sessão iniciada. O acesso ao Madeira Quest e à sincronização de atividades está associado à tua conta.</p><div className="profile-feature-list"><span><Camera size={16} /> Fotografias locais</span><span><Heart size={16} /> Gostos locais</span><span><Star size={16} /> Avaliações preparadas para API</span><span><Activity size={16} /> Atividades guardadas</span></div></section><section className="source-section profile-source"><div><span className="section-kicker">Transparência</span><h2>Fontes da ilha</h2><p>Verifica informações e condições nos canais oficiais.</p></div><div className="source-links">{officialSources.map((source) => <a href={source.url} target="_blank" rel="noreferrer" key={source.label}>{source.label}<ArrowUpRight size={13} /></a>)}</div></section></section>}
           </>}
         </main>
       </div>
