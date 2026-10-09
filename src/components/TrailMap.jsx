@@ -21,7 +21,8 @@ function mapStyle() {
 export default function TrailMap({ trail, position, points, onLocate, onStart, tracking, paused }) {
   const container = useRef(null)
   const map = useRef(null)
-  const markers = useRef([])
+  const trailMarker = useRef(null)
+  const userMarker = useRef(null)
   const onLocateRef = useRef(onLocate)
   onLocateRef.current = onLocate
 
@@ -47,8 +48,10 @@ export default function TrailMap({ trail, position, points, onLocate, onStart, t
     })
     map.current = instance
     return () => {
-      markers.current.forEach((marker) => marker.remove())
-      markers.current = []
+      trailMarker.current?.remove()
+      userMarker.current?.remove()
+      trailMarker.current = null
+      userMarker.current = null
       instance.remove()
       map.current = null
     }
@@ -57,30 +60,27 @@ export default function TrailMap({ trail, position, points, onLocate, onStart, t
   useEffect(() => {
     const instance = map.current
     if (!instance) return
-    markers.current.forEach((marker) => marker.remove())
-    markers.current = []
+    trailMarker.current?.remove()
+    trailMarker.current = null
     if (trail) {
-      const marker = new Marker({ color: '#d89b47' }).setLngLat(trail.coordinates).setPopup(
+      trailMarker.current = new Marker({ color: '#d89b47' }).setLngLat(trail.coordinates).setPopup(
         new Popup({ offset: 20 }).setText(`${trail.code} · ${trail.name} · localização aproximada`),
       ).addTo(instance)
-      markers.current.push(marker)
       instance.flyTo({ center: trail.coordinates, zoom: 11, duration: 650 })
-    } else if (!position) {
+    } else {
       instance.flyTo({ center: madeiraCenter, zoom: 9, duration: 650 })
     }
-  }, [trail, position])
+  }, [trail])
 
   useEffect(() => {
     const instance = map.current
     if (!instance || !position) return
-    if (!markers.current.some((marker) => marker.getElement().dataset.userLocation === 'true')) {
+    if (!userMarker.current) {
       const element = document.createElement('div')
       element.className = 'user-location-marker'
-      element.dataset.userLocation = 'true'
-      markers.current.push(new Marker({ element }).setLngLat(position).setPopup(new Popup({ offset: 16 }).setText('A tua localização')).addTo(instance))
+      userMarker.current = new Marker({ element }).setLngLat(position).setPopup(new Popup({ offset: 16 }).setText('A tua localização')).addTo(instance)
     } else {
-      const userMarker = markers.current.find((marker) => marker.getElement().dataset.userLocation === 'true')
-      userMarker.setLngLat(position)
+      userMarker.current.setLngLat(position)
     }
     if (tracking) instance.easeTo({ center: position, duration: 500 })
   }, [position, tracking])

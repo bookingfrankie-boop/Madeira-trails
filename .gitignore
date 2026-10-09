@@ -2,8 +2,8 @@ node_modules/
 dist/
 .vite/
 .DS_Store
- .env
- .env.*
+.env
+.env.*
 !.env.example
-.vercel
-.railway
+.vercel/
+.railway/
