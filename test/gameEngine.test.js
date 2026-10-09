@@ -33,11 +33,11 @@ test('zone catalogue is restricted to the ten municipalities of Madeira island',
   assert.deepEqual(new Set(madeiraZones.map((zone) => zone.id)).size, 10)
 })
 
-test('unsupported activity types do not create extra modalities', () => {
+test('unsupported activity types are excluded from modality progress', () => {
   const stats = getGameStats([
     { distance: 100, elapsed: 100, activityType: 'walking' },
     { distance: 100, elapsed: 100, activityType: 'hacking' },
   ])
-  assert.equal(stats.totalTypes, 2)
+  assert.equal(stats.totalTypes, 1)
   assert.equal(stats.totalMeters, 200)
 })
