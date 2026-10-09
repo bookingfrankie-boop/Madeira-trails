@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Check server JavaScript syntax
-        run: node --check server/index.js
+        run: node --check server/index.js && node --check server/gameRules.js
       - name: Run game rule tests
         run: npm test
       - name: Build production bundle
