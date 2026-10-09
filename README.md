@@ -1,6 +1,6 @@
 # Madeira Trails
 
-Aplicação web/PWA mobile-first para descobrir percursos pedestres na Ilha da Madeira e registar caminhadas no próprio dispositivo. Não exige conta nem tem backend.
+Aplicação web/PWA mobile-first para explorar percursos e jogar Madeira Quest, com território limitado à ilha da Madeira. O modo local funciona sem conta; o modo multiplayer usa uma API Node.js e o serviço PostgreSQL já existente quando configurado.
 
 ## Desenvolvimento
 
@@ -19,7 +19,10 @@ O endereço local é indicado pelo Vite. Para verificar a versão de produção,
 - Mapa MapLibre GL com cartografia OpenStreetMap, posição GPS, acompanhamento e trajetória medida no dispositivo.
 - Iniciar, pausar, retomar e terminar caminhadas. Atividades e notas sociais ficam em `localStorage`.
 - Manifest PWA, atualizações automáticas do service worker, interface pré-armazenada e cache limitado de tiles já visitados.
-- Estrutura de serviços pronta para substituir o catálogo e armazenamento locais por uma API futura.
+- Madeira Quest: níveis, XP, missões, quatro modalidades e dez zonas municipais da ilha.
+- API multiplayer em Node.js com contas, sessões HttpOnly, classificação global e agregados por zona.
+- Validação server-side de amostras GPS com limites de território, duração e velocidade; a rota bruta não é persistida.
+- Sem dependência de serviços pagos adicionais no código; reutiliza PostgreSQL já existente quando configurado.
 
 ## Dados e segurança no trilho
 
@@ -48,7 +51,7 @@ public/
 
 ## Railway
 
-O `railway.json` define build e start para o serviço web. O processo de produção escuta em `0.0.0.0:$PORT`. Liga o repositório no Railway e publica o serviço; não são necessárias variáveis ou bases de dados nesta fase.
+O `railway.json` define build e start para o serviço web. O processo de produção escuta em `0.0.0.0:$PORT`. O servidor serve o frontend e a API no mesmo serviço. Para ativar multiplayer, configura `DATABASE_URL` no serviço web existente como referência privada ao Postgres existente; não criar outro projeto, serviço ou base de dados. Sem essa variável, o frontend continua disponível, mas a API devolve `503` e não permite contas globais. Não publicar antes de configurar e testar a ligação à base de dados.
 
 
 ## Madeira Quest — protótipo de jogo
