@@ -67,10 +67,10 @@ export default function TrailMap({ trail, position, points, onLocate, onStart, t
         new Popup({ offset: 20 }).setText(`${trail.code} · ${trail.name} · localização aproximada`),
       ).addTo(instance)
       instance.flyTo({ center: trail.coordinates, zoom: 11, duration: 650 })
-    } else if (!position) {
+    } else {
       instance.flyTo({ center: madeiraCenter, zoom: 9, duration: 650 })
     }
-  }, [trail, position])
+  }, [trail]
 
   useEffect(() => {
     const instance = map.current
